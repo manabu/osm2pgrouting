@@ -26,6 +26,10 @@
 #include "Node.h"
 #include "utils.h"
 
+long long startElementCountNode = 0;
+long long endElementCountWay = 0;
+long long endElementCountRelation = 0;
+
 // define here, which streetstype you want to parse
 // for applying this filter, compile with "DISTRICT" as flag (g++ -DRESTRICT)
 //#define _FILTER if(m_pActWay->highway == "motorway" || m_pActWay->highway == "primary" || m_pActWay->highway == "secondary")
@@ -89,10 +93,12 @@ void OSMDocumentParserCallback::StartElement( const char *name, const char** att
 			if( strcmp(name,"ref")==0 )
 			{
 				long long nodeRefId = atoll( value );
-                                m_pActWay->AddNodeRef( m_rDocument.FindNode( nodeRefId ) );
                                   Node * node = m_rDocument.FindNode( nodeRefId );
+                                m_pActWay->AddNodeRef( node );
+
                                   if(node != 0 ){
                                     node->numsOfUse+=1;
+				    m_rDocument.AddNode(node);
                                   }else {
                                     std::cout << "Reference nd=" << nodeRefId << " has no corresponding Node Entry (Maybe Node entry after Reference?)" << std::endl;
                                   }
@@ -101,6 +107,7 @@ void OSMDocumentParserCallback::StartElement( const char *name, const char** att
 	} 
 	else if( strcmp(name,"node") == 0 )
 	{
+	  startElementCountNode++;
 		if (atts != NULL)
 		{
 			long long id=-1;
@@ -124,7 +131,8 @@ void OSMDocumentParserCallback::StartElement( const char *name, const char** att
 					lon = atof( value );
 				}
 			}
-			if( id>0 ) m_rDocument.AddNode( new Node( id, lat, lon ) );
+			//if( id>0 ) m_rDocument.AddNode( new Node( id, lat, lon ) );
+			if( id>0 ) m_rDocument.AddNode( id, lat, lon , 0 );
 		}
 	}
 	// THIS IS THE RELATION CODE...
@@ -320,6 +328,8 @@ void OSMDocumentParserCallback::EndElement( const char* name )
 {
 	if( strcmp(name,"way") == 0 )
 	{
+	  endElementCountWay++;
+
 		//#ifdef RESTRICT
 		//_FILTER
 		
@@ -338,18 +348,23 @@ void OSMDocumentParserCallback::EndElement( const char* name )
 		}
 		else
 		{
-		// std::cout<<"We DON'T need a way of type "<<m_pActWay->type<<" and class "<< m_pActWay->clss<<std::endl;
+		  // std::cout<<"We DON'T need a way of type "<<m_pActWay->type<<" and class "<< m_pActWay->clss<<std::endl;
 			// delete m_pActWay;
 		}
 		//#endif
 
-		m_pActWay = 0;
+		//m_pActWay = 0;
+		delete m_pActWay;
+		m_pActWay = NULL;
 	}
 	// THIS IS THE RELATION CODE...
 	else if( strcmp(name,"relation") == 0 )
 	{
+	  endElementCountRelation++;
 		m_rDocument.AddRelation( m_pActRelation );
-		m_pActRelation = 0;		
+		delete m_pActRelation;
+		m_pActRelation = NULL;
+		//m_pActRelation = 0;
 
 		// std::cout<<"Adding relation: "<<m_pActRelation->id<<std::endl;
 	}

@@ -28,6 +28,17 @@
 #include "Relation.h"
 #include "Export2DB.h"
 
+// OSMDocument
+extern long long countAddNode;
+extern long long countAddWay;
+extern long long countAddRelation;
+extern long long countFindNode;
+// OSMDocumentParserCallack
+extern long long startElementCountNode;
+extern long long endElementCountWay;
+extern long long endElementCountRelation;
+extern bool isWrite;
+
 using namespace osm;
 using namespace xml;
 using namespace std;
@@ -141,6 +152,7 @@ int main(int argc, char* argv[])
 	}
 
 	Export2DB test(host, user, dbname, port, passwd, prefixtables);
+
 	if(test.connect()==1)
 		return 1;
 
@@ -173,10 +185,22 @@ int main(int argc, char* argv[])
 		cerr << "Failed to parse data file " << file.c_str() << endl;
 		return 1;
 	}
+	cout << "StartElement Node called " << startElementCountNode << "times." << endl;
+	cout << "AddNode called " << countAddNode << "times." << endl;
+	cout << "EndElement Way called " << endElementCountWay << "times." << endl;
+	cout << "AddWay called " << countAddWay << "times." << endl;
+	cout << "EndElement Relation called " << endElementCountRelation << "times." << endl;
+	cout << "AddRelation called " << countAddRelation << "times." << endl;
+	cout << "FindNode called " << countFindNode << "times." << endl;
 
+	//return 0;
+
+	//isWrite = true;
 	cout << "Split ways" << endl;
 
 	document->SplitWays();
+	cout << "Split ways finish" << endl;
+
 	//############# Export2DB
 	{
 
@@ -194,17 +218,18 @@ int main(int argc, char* argv[])
     test.exportTypesWithClasses(config->m_Types);
 
 		cout << "Adding relations to database..." << endl;
-		test.exportRelations(document->m_Relations, config);
-
+		//test.exportRelations(document->m_Relations, config);
+		test.exportRelations(*document, config);
 		// Optional user argument skipnodes will not add nodes to the database (saving a lot of time if not necessary)
 		if ( !skipnodes) {
 			cout << "Adding nodes to database..." << endl;
-			test.exportNodes(document->m_Nodes);
+			//test.exportNodes(document->m_Nodes);
+			test.exportNodes(*document);
 		}
 
 		cout << "Adding ways to database..." << endl;
-		test.exportWays(document->m_SplittedWays, config);
-		
+		//test.exportWays(document->m_SplittedWays, config);
+		test.exportWays(*document, config);
 		//TODO: make some free memory, document will be not used anymore, so there will be more memory available to future DB operations.
 
 		cout << "Creating topology..." << endl;
@@ -247,8 +272,8 @@ int main(int argc, char* argv[])
 
 	cout << "#########################" << endl;
 
-	cout << "size of streets: " << document->m_Ways.size() <<	endl;
-	cout << "size of splitted ways : " << document->m_SplittedWays.size() <<	endl;
+	cout << "size of streets: " << document->m_WaysIDs.size() <<	endl;
+	cout << "size of splitted ways : " << document->m_SplittedWaysIDs.size() <<	endl;
 
 	cout << "finished" << endl;
 

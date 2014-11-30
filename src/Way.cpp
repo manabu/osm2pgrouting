@@ -20,6 +20,7 @@
 
 #include "stdafx.h"
 #include "Way.h"
+#include <iostream>
 
 
 namespace osm
@@ -39,6 +40,23 @@ Way::Way( long long id, bool visible, long long osm_id, int maxspeed_forward, in
 
 Way::~Way()
 {
+
+  while(!m_NodeRefs.empty()) {
+    Node* p = m_NodeRefs.back();
+    if(p!=NULL){
+      delete p;
+      p=NULL;
+    }
+    m_NodeRefs.pop_back();
+  }
+
+  /*
+  for (std::vector<Node*>::iterator it = m_NodeRefs.begin(); it != m_NodeRefs.end(); ++it) {
+    delete *it;
+  }
+  */
+  //  std::cout << "Destroy Way " << std::endl;
+
 }
 
 void Way::AddNodeRef( Node* pNode )

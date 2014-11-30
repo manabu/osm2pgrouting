@@ -30,6 +30,8 @@
 #include "Class.h"
 #include "Configuration.h"
 
+#include "OSMDocument.h"
+#include <set>
 using namespace osm;
 
 /**
@@ -61,9 +63,13 @@ public:
  	void createTables();
  	//! exports nodes to the database
  	void exportNodes(std::map<long long, Node*>& nodes);
+	void exportNodes(OSMDocument& doc);
  	//! exports ways to the database
  	void exportWays(std::vector<Way*>& ways, Configuration* config);
+	void exportWays(OSMDocument& doc, Configuration* config);
  	void exportRelations(std::vector<Relation*>& relations, Configuration* config);
+	//
+	void exportRelations(OSMDocument& doc, Configuration* config);
 
  	void exportTypesWithClasses(std::map<std::string, Type*>& types);
 

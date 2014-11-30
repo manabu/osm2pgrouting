@@ -23,6 +23,11 @@
 
 #include "Configuration.h"
 
+#include "leveldb/db.h"
+#include <iostream>
+#include <sstream>
+#include <string>
+#include <set>
 namespace osm
 {
 
@@ -39,15 +44,22 @@ class OSMDocument
 public:
 	//! Map, which saves the parsed nodes
 	std::map<long long, Node*> m_Nodes;
+
 	//! parsed ways
 	std::vector<Way*> m_Ways;
+	std::vector<long long> m_WaysIDs;
 	//! splitted ways
 	std::vector<Way*> m_SplittedWays;
+	std::vector<long long> m_SplittedWaysIDs;
 
 	std::vector<Relation*> m_Relations;
+	std::vector<long long> m_RelationsIDs;
 
 
 	Configuration& m_rConfig;
+        //
+        leveldb::DB* db;
+        leveldb::WriteOptions writeOptions;
 public:
 
 	//! Constructor
@@ -56,15 +68,35 @@ public:
 	virtual ~OSMDocument();
 	//! add node to the map
 	void AddNode( Node* n );
+	//! add node to the map
+	void AddNode( long long id, double lat, double lon,unsigned short numsOfUse );
 	//! add way to the map
 	void AddWay( Way* w );
+	//! add splitted way to the map
+	void AddSplittedWay( Way* w );
 	//! find node by using an ID
 	Node* FindNode( long long nodeRefId ) const;
+	//! find node by using an ID
+	Node* FindNodeMain( long long nodeRefId ) const;
+	//! find way by using an ID
+	Way* FindWay( long long wayRefId ) const;
+	//! find splitted way by using an ID
+	Way* FindSplittedWay( long long wayRefId ) const;
+	//! find way by using an ID
+	Way* FindWayFromDB( long long wayRefId, char prefix ) const;
+	//! find way by using an ID
+	Way* FindWayFromDBMain( long long wayRefId, char prefix ) const;
 	//! split the ways
 	void SplitWays();
 	//Node* getNode( long long nodeRefId );
+	leveldb::Iterator * getDBIterator();
+	//Node* FindNode(leveldb::Iterator *it);
+	Node* convertToNode(std::string value) const;
+
 
 	void AddRelation( Relation* r );
+	//
+	Relation* FindRelation(long long relationRefId) const;
 
 };
 

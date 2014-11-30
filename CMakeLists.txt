@@ -16,7 +16,7 @@ INCLUDE_DIRECTORIES(src ${PostgreSQL_INCLUDE_DIRS} ${EXPAT_INCLUDE_DIRS} ${Boost
 link_directories(${PostgreSQL_LIBRARY_DIRS})
 
 ADD_EXECUTABLE(osm2pgrouting ${SRC})
-TARGET_LINK_LIBRARIES(osm2pgrouting ${PostgreSQL_LIBRARIES} ${EXPAT_LIBRARIES})
+TARGET_LINK_LIBRARIES(osm2pgrouting ${PostgreSQL_LIBRARIES} ${EXPAT_LIBRARIES} -lleveldb -lpthread -lsnappy)
 
 INSTALL(TARGETS osm2pgrouting
   RUNTIME DESTINATION "/usr/share/bin"

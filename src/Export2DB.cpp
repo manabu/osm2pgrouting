@@ -192,6 +192,52 @@ void Export2DB::exportNodes(std::map<long long, Node*>& nodes)
 	PQputline(mycon, "\\.\n");
 	PQendcopy(mycon);
 }
+void Export2DB::exportNodes(OSMDocument& doc)
+{
+
+	//std::map<long long, Node*>::iterator it(nodeIDs.begin());
+	//std::map<long long, Node*>::iterator last(nodeIDs.end());
+	leveldb::Iterator *it = doc.getDBIterator();
+	it->SeekToFirst();
+    std::string copy_nodes( "COPY " + tables_prefix + "nodes(id, lon, lat, numofuse) FROM STDIN");
+	//PGresult* res = PQexec(mycon, tables_prefix.c_str());
+	PGresult* res = PQexec(mycon, copy_nodes.c_str());
+	PQclear(res);
+
+	while(it->Valid())
+	{
+	  //while(it!=last)
+	  //{
+	    //Node* node = (*it++).second;
+
+	  std::string key = it->key().ToString();
+	  int loc = key.find("n",0);
+	  //std::cout << "exportKey[" << key << "], loc=" <<loc<< std::endl;
+	  if(loc==std::string::npos){
+	    it->Next();
+	    continue;
+	  }
+	  std::string value = it->value().ToString();
+	  //std::cout << "exportValue[" << value << "]" << std::endl;
+	  Node* node = doc.convertToNode(value);
+	  it->Next();
+		if(!node){
+		  continue;
+		}
+		std::string row_data = TO_STR(node->id);
+		row_data += "\t";
+		row_data += TO_STR(node->lon);
+		row_data += "\t";
+		row_data += TO_STR(node->lat);
+		row_data += "\t";
+		row_data += TO_STR(node->numsOfUse);
+		row_data += "\n";
+		PQputline(mycon, row_data.c_str());
+		delete node;
+	}
+	PQputline(mycon, "\\.\n");
+	PQendcopy(mycon);
+}
 
 void Export2DB::exportRelations(std::vector<Relation*>& relations, Configuration* config)
 {
@@ -203,6 +249,66 @@ void Export2DB::exportRelations(std::vector<Relation*>& relations, Configuration
 	while( it_relation!=last_relation )
 	{
 		Relation* relation = *it_relation++;
+		std::map<std::string, std::string>::iterator it_tag( relation->m_Tags.begin() );
+		std::map<std::string, std::string>::iterator last_tag( relation->m_Tags.end() );
+		while( it_tag!=last_tag )
+		{
+			std::pair<std::string, std::string> pair = *it_tag++;
+			std::string row_data = TO_STR(relation->id);
+			row_data += "\t";
+			row_data += TO_STR(config->FindType(pair.first)->id);
+			row_data += "\t";
+			row_data += TO_STR(config->FindClass(pair.first, pair.second)->id);
+			row_data += "\t";
+			if(!relation->name.empty())
+		{
+			std::string escaped_name = relation->name;
+			boost::replace_all(escaped_name, "\t", "\\\t");
+				row_data += escaped_name;
+			}
+			row_data += "\n";
+			PQputline(mycon, row_data.c_str());
+		}
+	}
+	PQputline(mycon, "\\.\n");
+	PQendcopy(mycon);
+
+	// Second round of iteration is needed to copy relation_ways
+	it_relation = relations.begin();
+    std::string copy_relation_ways( "COPY " + tables_prefix + "relation_ways(relation_id, way_id) FROM STDIN");
+	res = PQexec(mycon, copy_relation_ways.c_str());
+	PQclear(res);
+	while( it_relation!=last_relation )
+	{
+		Relation* relation = *it_relation++;
+		std::vector<long long>::iterator it_way( relation->m_WayRefs.begin() );
+		std::vector<long long>::iterator last_way( relation->m_WayRefs.end() );
+
+		while( it_way!=last_way )
+		{
+			long long way_id = *it_way++;
+			std::string row_data = TO_STR(relation->id);
+			row_data += "\t";
+			row_data += TO_STR(way_id);
+			row_data += "\n";
+			PQputline(mycon, row_data.c_str());
+		}
+	}
+	PQputline(mycon, "\\.\n");
+	PQendcopy(mycon);
+}
+void Export2DB::exportRelations(OSMDocument& doc, Configuration* config)
+{
+  std::vector<long long>& relationIDs = doc.m_RelationsIDs;
+	std::vector<long long>::iterator it_relation( relationIDs.begin() );
+	std::vector<long long>::iterator last_relation( relationIDs.end() );
+    std::string copy_relations( "COPY " + tables_prefix + "relations(relation_id, type_id, class_id, name) FROM STDIN");
+	PGresult* res = PQexec(mycon, copy_relations.c_str());
+	PQclear(res);
+	while( it_relation!=last_relation )
+	{
+	  //Relation* relation = *it_relation++;
+	  Relation* relation = doc.FindRelation(*it_relation++);
 		std::map<std::string, std::string>::iterator it_tag( relation->m_Tags.begin() );
 		std::map<std::string, std::string>::iterator last_tag( relation->m_Tags.end() );
 		while( it_tag!=last_tag )
@@ -228,13 +334,14 @@ void Export2DB::exportRelations(std::vector<Relation*>& relations, Configuration
 	PQendcopy(mycon);
 
 	// Second round of iteration is needed to copy relation_ways
-	it_relation = relations.begin();
+	it_relation = relationIDs.begin();
     std::string copy_relation_ways( "COPY " + tables_prefix + "relation_ways(relation_id, way_id) FROM STDIN");
 	res = PQexec(mycon, copy_relation_ways.c_str());
 	PQclear(res);
 	while( it_relation!=last_relation )
 	{
-		Relation* relation = *it_relation++;
+	  //Relation* relation = *it_relation++;
+		Relation* relation = doc.FindRelation(*it_relation++);
 		std::vector<long long>::iterator it_way( relation->m_WayRefs.begin() );
 		std::vector<long long>::iterator last_way( relation->m_WayRefs.end() );
 
@@ -329,6 +436,114 @@ void Export2DB::exportWays(std::vector<Way*>& ways, Configuration* config)
 
 		//reverse_cost
 		if(way->oneWayType==YES)
+			row_data += TO_STR(way->length*1000000);
+		else
+			row_data += TO_STR(way->length);
+
+		row_data += "\t";
+
+		//maxspeed
+		row_data += TO_STR(way->maxspeed_forward);
+		row_data += "\t";
+		row_data += TO_STR(way->maxspeed_backward);
+		row_data += "\t";
+
+		//priority
+		row_data += TO_STR(config->FindClass(way->type,way->clss)->priority);
+		row_data += "\t";
+
+		//name
+		if(!way->name.empty())
+		{
+		        std::string escaped_name = way->name;
+		        boost::replace_all(escaped_name, "\\", "");
+			boost::replace_all(escaped_name, "\t", "\\\t");
+			boost::replace_all(escaped_name, "\n", "");
+			boost::replace_all(escaped_name, "\r", "");
+			row_data += escaped_name.substr(0,199);
+		}
+		row_data += "\n";
+		//cout<<row_data<<endl;
+		PQputline(mycon, row_data.c_str());
+	}
+	PQputline(mycon, "\\.\n");
+	PQendcopy(mycon);
+}
+void Export2DB::exportWays(OSMDocument& doc, Configuration* config)
+{
+  std::vector<long long>& waysIDs = doc.m_SplittedWaysIDs;
+  //std::vector<Way*>::iterator it_way( ways.begin() );
+  //std::vector<Way*>::iterator last_way( ways.end() );
+	std::vector<long long>::iterator it_way( waysIDs.begin() );
+	std::vector<long long>::iterator last_way( waysIDs.end() );
+    std::string copy_way_tag( "COPY " + tables_prefix + "way_tag(type_id, class_id, way_id) FROM STDIN");
+	PGresult* res = PQexec(mycon, copy_way_tag.c_str());
+	PQclear(res);
+	while( it_way!=last_way )
+	{
+	  //Way* way = *it_way++;
+	  Way* way = doc.FindSplittedWay(*it_way++);
+		if(!way){
+		  continue;
+		}
+		std::map<std::string, std::string>::iterator it_tag( way->m_Tags.begin() );
+		std::map<std::string, std::string>::iterator last_tag( way->m_Tags.end() );
+		while( it_tag!=last_tag )
+		{
+			std::pair<std::string, std::string> pair = *it_tag++;
+			std::string row_data = TO_STR(config->FindType(pair.first)->id);
+			row_data += "\t";
+			row_data += TO_STR(config->FindClass(pair.first, pair.second)->id);
+			row_data += "\t";
+			row_data += TO_STR(way->id);
+			row_data += "\n";
+
+			PQputline(mycon, row_data.c_str());
+		}
+		delete way;
+	}
+	PQputline(mycon, "\\.\n");
+	PQendcopy(mycon);
+	std::cout << "phase1 fin" << std::endl;
+	it_way = waysIDs.begin();
+    std::string copy_ways( "COPY " + tables_prefix + "ways(gid, class_id, length, x1, y1, x2, y2, osm_id, the_geom, reverse_cost, maxspeed_forward, maxspeed_backward, priority, name) FROM STDIN");
+	res = PQexec(mycon, copy_ways.c_str());
+	while( it_way!=last_way )
+	{
+	  //Way* way = *it_way++;
+	  Way* way = doc.FindSplittedWay(*it_way++);
+		if(!way){
+		  continue;
+		}
+
+	  //std::cout << "way " << way->id << "osmid" << way->osm_id <<  std::endl;
+		std::string row_data = TO_STR(way->id);
+		row_data += "\t";
+		row_data += TO_STR(config->FindClass(way->type, way->clss)->id);
+		row_data += "\t";
+		//row_data += TO_STR(way->length);
+		//length based on oneway
+		if(way->oneWayType==REVERSED)
+			row_data += TO_STR(way->length*1000000);
+		else
+			row_data += TO_STR(way->length);
+
+		row_data += "\t";
+		row_data += TO_STR(way->m_NodeRefs.front()->lon);
+		row_data += "\t";
+		row_data += TO_STR(way->m_NodeRefs.front()->lat);
+		row_data += "\t";
+		row_data += TO_STR(way->m_NodeRefs.back()->lon);
+		row_data += "\t";
+		row_data += TO_STR(way->m_NodeRefs.back()->lat);
+		row_data += "\t";
+		row_data += TO_STR(way->osm_id);
+		row_data += "\t";
+		row_data += "srid=4326;" + way->geom;
+		row_data += "\t";
+
+		//reverse_cost
+		if(way->oneWayType==YES)
 	    	row_data += TO_STR(way->length*1000000);
 		else
 			row_data += TO_STR(way->length);
@@ -358,6 +573,7 @@ void Export2DB::exportWays(std::vector<Way*>& ways, Configuration* config)
 		row_data += "\n";
 		//cout<<row_data<<endl;
 		PQputline(mycon, row_data.c_str());
+		delete way;
 	}
 	PQputline(mycon, "\\.\n");
 	PQendcopy(mycon);
