@@ -177,8 +177,11 @@ int main(int argc, char* argv[])
     OSMDocumentParserCallback callback(*document);
 
 	cout << "Trying to parse data" << endl;
-
+        if(file=="-"){
+	ret = parser.Parse( callback);
+        }else{
 	ret = parser.Parse( callback, file.c_str() );
+        }
 	if( ret!=0 ) {
 		if( ret == 1 )
 			cerr << "Failed to open data file" << endl;

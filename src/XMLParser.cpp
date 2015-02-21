@@ -45,11 +45,23 @@ static void endElement(void *userData, const char *name)
 
 
 
+int XMLParser::Parse( XMLParserCallback& rCallback )
+{
+  int ret = 1; // File not found
+
+  return Parse_main(rCallback, "STDIN", stdin);
+}
 int XMLParser::Parse( XMLParserCallback& rCallback, const char* chFileName )
 {
   int ret = 1; // File not found
 
   FILE* fp = fopen(chFileName,"rb");
+  return Parse_main(rCallback, chFileName, fp);
+}
+
+int XMLParser::Parse_main( XMLParserCallback& rCallback,const char* chFileName, FILE *fp )
+{
+  int ret = 1;
   if( fp )
   {
     XML_Parser parser = XML_ParserCreate(NULL);

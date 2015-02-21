@@ -84,6 +84,8 @@ public:
     \return 0: everything ok, 1: file not found, 2: parsing error
    */  
 	int Parse( XMLParserCallback& rCallback, const char* chFileName );
+	int Parse( XMLParserCallback& rCallback);
+	int Parse_main( XMLParserCallback& rCallback,const char* chFileName, FILE* fp );
 
 private:
 	//! the expat parser object / imported from „expat.h“
